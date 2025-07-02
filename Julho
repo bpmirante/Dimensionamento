@@ -1,0 +1,45 @@
+from flask import Flask, render_template, request, send_from_directory, url_for
+import qrcode
+import os
+import uuid
+
+app = Flask(__name__)
+
+# Pasta para salvar arquivos enviados
+UPLOAD_FOLDER = 'uploads'
+QR_FOLDER = 'static/qrcodes'
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(QR_FOLDER, exist_ok=True)
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    qr_img_url = None
+    if request.method == 'POST':
+        # Pega arquivo enviado
+        file = request.files.get('file')
+        if file:
+            # Salva arquivo com nome único
+            filename = f"{uuid.uuid4()}_{file.filename}"
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            file.save(filepath)
+
+            # URL do arquivo (supondo que roda localmente em localhost:5000)
+            file_url = url_for('uploaded_file', filename=filename, _external=True)
+
+            # Gera QR Code do link
+            qr = qrcode.make(file_url)
+            qr_filename = f"{uuid.uuid4()}.png"
+            qr_path = os.path.join(QR_FOLDER, qr_filename)
+            qr.save(qr_path)
+
+            # URL da imagem QR Code para exibir na página
+            qr_img_url = url_for('static', filename=f'qrcodes/{qr_filename}')
+    return render_template('index.html', qr_img_url=qr_img_url)
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename)
+
+if __name__ == '__main__':
+    app.run(debug=True)
